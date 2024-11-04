@@ -1,4 +1,4 @@
-'use client'
+'use client'//テスト
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
