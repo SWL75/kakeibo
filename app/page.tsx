@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { useState, useEffect, useCallback } from 'react'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -45,7 +45,7 @@ type MonthlyAnalysis = {
 }
 
 export default function HouseholdBudgetApp() {
-  const [supabase, setSupabase] = useState<any>(null)
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [date, setDate] = useState('')
   const [player, setPlayer] = useState('')
@@ -71,13 +71,8 @@ export default function HouseholdBudgetApp() {
     }
   }, [])
 
-  useEffect(() => {
-    if (supabase) {
-      fetchExpenses()
-    }
-  }, [supabase])
-
-  async function fetchExpenses() {
+  const fetchExpenses = useCallback(async () => {
+    if (!supabase) return;
     setIsLoading(true)
     try {
       const { data, error } = await supabase
@@ -92,7 +87,13 @@ export default function HouseholdBudgetApp() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    if (supabase) {
+      fetchExpenses()
+    }
+  }, [supabase, fetchExpenses])
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense)
@@ -113,7 +114,7 @@ export default function HouseholdBudgetApp() {
   }
 
   const handleUpdate = async () => {
-    if (!editingExpense) return
+    if (!supabase || !editingExpense) return
 
     try {
       setIsLoading(true)
@@ -142,7 +143,7 @@ export default function HouseholdBudgetApp() {
   }
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('この支出を削除してもよろしいですか？')) return
+    if (!supabase) return
 
     try {
       setIsLoading(true)
@@ -164,6 +165,7 @@ export default function HouseholdBudgetApp() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!supabase) return;
     setIsLoading(true)
     try {
       if (isEditing) {
