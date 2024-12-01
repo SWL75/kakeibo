@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
 import { PlusCircle, Calendar, User, DollarSign, Tag, Pencil, Trash2, X, Check, Loader2 } from 'lucide-react'
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 
 type Expense = {
