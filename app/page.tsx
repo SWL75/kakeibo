@@ -11,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Switch } from "@/components/ui/switch"
-import { PlusCircle, Calendar, User, DollarSign, Tag, Pencil, Trash2, X, Check, Loader2, Settings } from 'lucide-react'
+import { PlusCircle, Calendar, User, DollarSign, Tag, Pencil, Trash2, X, Check, Loader2 } from 'lucide-react'
 import { useToast } from "@/components/ui/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 
 type Expense = {
   id: number
@@ -70,7 +71,7 @@ export default function HouseholdBudgetApp() {
         variant: "destructive",
       })
     }
-  }, [])
+  }, [toast])
 
   const fetchExpenses = useCallback(async () => {
     if (!supabase) return
@@ -93,7 +94,7 @@ export default function HouseholdBudgetApp() {
     } finally {
       setIsLoading(false)
     }
-  }, [supabase])
+  }, [supabase, toast])
 
   useEffect(() => {
     if (supabase) {
@@ -646,6 +647,7 @@ export default function HouseholdBudgetApp() {
           </Tabs>
         </CardContent>
       </Card>
+      <Toaster />
     </div>
   )
 }
