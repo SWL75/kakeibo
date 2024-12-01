@@ -1,4 +1,4 @@
-'use client'//テスト
+'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
@@ -10,18 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { 
-  PlusCircle, 
-  Calendar, 
-  User, 
-  DollarSign, 
-  Tag, 
-  Pencil, 
-  Trash2, 
-  X, 
-  Check,
-  Loader2
-} from 'lucide-react'
+import { Switch } from "@/components/ui/switch"
+import { PlusCircle, Calendar, User, DollarSign, Tag, Pencil, Trash2, X, Check, Loader2, Settings } from 'lucide-react'
+import { useToast } from "@/components/ui/use-toast"
 
 type Expense = {
   id: number
@@ -38,7 +29,7 @@ type Settlement = {
 }
 
 type MonthlyAnalysis = {
-  month: string
+  period: string
   total_amount: number
   category_totals: { [key: string]: number }
   player_totals: { [key: string]: number }
@@ -55,9 +46,12 @@ export default function HouseholdBudgetApp() {
   const [isEditing, setIsEditing] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isClient, setIsClient] = useState(false)
+  const [settlementDay, setSettlementDay] = useState(20)
+  const [useCustomSettlement, setUseCustomSettlement] = useState(false)
+  const { toast } = useToast()
 
   const members = ['のり', 'ばん', 'きお']
-  const categories = ['食費', '日用品', '洗濯', '光熱費', 'その他']
+  const categories = ['食費', '日用品', '洗濯', '光熱費', '家賃', 'WiFi', 'その他']
 
   useEffect(() => {
     setIsClient(true)
@@ -68,11 +62,18 @@ export default function HouseholdBudgetApp() {
     if (supabaseUrl && supabaseAnonKey) {
       const supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
       setSupabase(supabaseClient)
+    } else {
+      console.error('Supabase URL or Anon Key is missing')
+      toast({
+        title: "エラー",
+        description: "Supabaseの設定が不完全です。",
+        variant: "destructive",
+      })
     }
   }, [])
 
   const fetchExpenses = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase) return
     setIsLoading(true)
     try {
       const { data, error } = await supabase
@@ -84,6 +85,11 @@ export default function HouseholdBudgetApp() {
       setExpenses(data || [])
     } catch (error) {
       console.error('支出の取得に失敗しました:', error)
+      toast({
+        title: "エラー",
+        description: "支出の取得に失敗しました。",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -94,6 +100,29 @@ export default function HouseholdBudgetApp() {
       fetchExpenses()
     }
   }, [supabase, fetchExpenses])
+
+  const calculateSettlementPeriod = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const day = date.getDate()
+
+    let startDate, endDate
+
+    if (useCustomSettlement) {
+      if (day <= settlementDay) {
+        startDate = new Date(year, month - 1, settlementDay + 1)
+        endDate = new Date(year, month, settlementDay)
+      } else {
+        startDate = new Date(year, month, settlementDay + 1)
+        endDate = new Date(year, month + 1, settlementDay)
+      }
+    } else {
+      startDate = new Date(year, month, 1)
+      endDate = new Date(year, month + 1, 0)
+    }
+
+    return { startDate, endDate }
+  }
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense)
@@ -135,8 +164,17 @@ export default function HouseholdBudgetApp() {
 
       await fetchExpenses()
       handleCancelEdit()
+      toast({
+        title: "更新成功",
+        description: "支出が正常に更新されました。",
+      })
     } catch (error) {
       console.error('支出の更新に失敗しました:', error)
+      toast({
+        title: "エラー",
+        description: "支出の更新に失敗しました。",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -156,8 +194,17 @@ export default function HouseholdBudgetApp() {
       if (error) throw error
 
       await fetchExpenses()
+      toast({
+        title: "削除成功",
+        description: "支出が正常に削除されました。",
+      })
     } catch (error) {
       console.error('支出の削除に失敗しました:', error)
+      toast({
+        title: "エラー",
+        description: "支出の削除に失敗しました。",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
@@ -165,7 +212,7 @@ export default function HouseholdBudgetApp() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!supabase) return;
+    if (!supabase) return
     setIsLoading(true)
     try {
       if (isEditing) {
@@ -189,21 +236,38 @@ export default function HouseholdBudgetApp() {
         setPlayer('')
         setAmount('')
         setCategory('')
+        toast({
+          title: "追加成功",
+          description: "新しい支出が正常に追加されました。",
+        })
       }
     } catch (error) {
       console.error('支出の追加に失敗しました:', error)
+      toast({
+        title: "エラー",
+        description: "支出の追加に失敗しました。",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
   }
 
   const calculateSettlements = () => {
-    const totalExpense = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+    const currentDate = new Date()
+    const { startDate, endDate } = calculateSettlementPeriod(currentDate)
+
+    const periodExpenses = expenses.filter(expense => {
+      const expenseDate = new Date(expense.date)
+      return expenseDate >= startDate && expenseDate <= endDate
+    })
+
+    const totalExpense = periodExpenses.reduce((sum, expense) => sum + expense.amount, 0)
     const equalShare = totalExpense / members.length
     const balances: {[key: string]: number} = {}
 
     members.forEach(member => {
-      balances[member] = expenses
+      balances[member] = periodExpenses
         .filter(expense => expense.player === member)
         .reduce((sum, expense) => sum + expense.amount, 0) - equalShare
     })
@@ -226,25 +290,28 @@ export default function HouseholdBudgetApp() {
   }
 
   const calculateMonthlyAnalysis = () => {
-    const monthlyData: { [key: string]: MonthlyAnalysis } = {}
+    const analysisData: { [key: string]: MonthlyAnalysis } = {}
 
     expenses.forEach(expense => {
-      const month = expense.date.slice(0, 7)
-      if (!monthlyData[month]) {
-        monthlyData[month] = {
-          month,
+      const expenseDate = new Date(expense.date)
+      const { startDate, endDate } = calculateSettlementPeriod(expenseDate)
+      const periodKey = `${startDate.toISOString().slice(0, 10)} ~ ${endDate.toISOString().slice(0, 10)}`
+
+      if (!analysisData[periodKey]) {
+        analysisData[periodKey] = {
+          period: periodKey,
           total_amount: 0,
           category_totals: {},
           player_totals: {}
         }
       }
 
-      monthlyData[month].total_amount += expense.amount
-      monthlyData[month].category_totals[expense.category] = (monthlyData[month].category_totals[expense.category] || 0) + expense.amount
-      monthlyData[month].player_totals[expense.player] = (monthlyData[month].player_totals[expense.player] || 0) + expense.amount
+      analysisData[periodKey].total_amount += expense.amount
+      analysisData[periodKey].category_totals[expense.category] = (analysisData[periodKey].category_totals[expense.category] || 0) + expense.amount
+      analysisData[periodKey].player_totals[expense.player] = (analysisData[periodKey].player_totals[expense.player] || 0) + expense.amount
     })
 
-    return Object.values(monthlyData).sort((a, b) => b.month.localeCompare(a.month))
+    return Object.values(analysisData).sort((a, b) => b.period.localeCompare(a.period))
   }
 
   if (!isClient) {
@@ -260,11 +327,12 @@ export default function HouseholdBudgetApp() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="input" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="input">入力</TabsTrigger>
               <TabsTrigger value="history">履歴</TabsTrigger>
               <TabsTrigger value="analysis">分析</TabsTrigger>
               <TabsTrigger value="settlements">精算</TabsTrigger>
+              <TabsTrigger value="settings">設定</TabsTrigger>
             </TabsList>
             <TabsContent value="input">
               <Card>
@@ -403,10 +471,8 @@ export default function HouseholdBudgetApp() {
                           <TableHead>金額</TableHead>
                           <TableHead>カテゴリ</TableHead>
                           <TableHead className="text-right">操作</TableHead>
-                        
                         </TableRow>
                       </TableHeader>
-                      
                       <TableBody>
                         {expenses.map((expense) => (
                           <TableRow key={expense.id}>
@@ -447,15 +513,15 @@ export default function HouseholdBudgetApp() {
             <TabsContent value="analysis">
               <Card>
                 <CardHeader>
-                  <CardTitle>月次分析</CardTitle>
-                  <CardDescription>月ごとの支出分析を表示します</CardDescription>
+                  <CardTitle>期間別分析</CardTitle>
+                  <CardDescription>精算期間ごとの支出分析を表示します</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[400px] w-full rounded-md border">
                     {calculateMonthlyAnalysis().map((analysis) => (
-                      <Card key={analysis.month} className="mb-4">
+                      <Card key={analysis.period} className="mb-4">
                         <CardHeader>
-                          <CardTitle>{analysis.month}</CardTitle>
+                          <CardTitle>{analysis.period}</CardTitle>
                           <CardDescription>合計支出: {analysis.total_amount.toLocaleString()}円</CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -538,6 +604,42 @@ export default function HouseholdBudgetApp() {
                   {calculateSettlements().length === 0 && (
                     <p className="text-center text-muted-foreground mt-4">現在、精算が必要な取引はありません。</p>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="settings">
+              <Card>
+                <CardHeader>
+                  <CardTitle>精算設定</CardTitle>
+                  <CardDescription>精算期間の設定を行います</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="custom-settlement"
+                        checked={useCustomSettlement}
+                        onCheckedChange={setUseCustomSettlement}
+                      />
+                      <Label htmlFor="custom-settlement">カスタム精算期間を使用</Label>
+                    </div>
+                    {useCustomSettlement && (
+                      <div className="grid gap-2">
+                        <Label htmlFor="settlement-day">締め日</Label>
+                        <Input
+                          id="settlement-day"
+                          type="number"
+                          min="1"
+                          max="28"
+                          value={settlementDay}
+                          onChange={(e) => setSettlementDay(Number(e.target.value))}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          毎月{settlementDay}日に締め、翌日から次の精算期間が始まります。
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
